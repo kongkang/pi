@@ -352,6 +352,66 @@ def ask(
     console.print(answer or "[dim](空回复)[/dim]")
 
 
+@app.command("feishu-setup")
+def feishu_setup(
+    app_id: str = typer.Option(..., "--app-id", prompt="飞书 App ID"),
+    app_secret: str = typer.Option(..., "--app-secret", prompt="飞书 App Secret", hide_input=True),
+) -> None:
+    """保存飞书应用凭证（写入状态目录，权限 0600，不进 git）。"""
+    from .orchestrator import save_credentials
+
+    cfg = cfgmod.load()
+    # 走统一的加锁 RMW + 原子替换：该文件同时存 chat_id，serve 进程也会写它
+    path = save_credentials(cfg, app_id.strip(), app_secret.strip())
+    console.print(f"[green]已保存[/green] → {path}（权限 0600）")
+    console.print("下一步：[cyan]pyagent serve[/cyan] 启动，然后在飞书给机器人发一句话。")
+
+
+@app.command()
+def serve(
+    model: str = typer.Option("", "--model", "-m", help="主对话使用的模型"),
+) -> None:
+    """启动飞书主对话守护进程（WebSocket 长连接，免公网 IP）。"""
+    from .orchestrator import Orchestrator, load_feishu_config
+
+    cfg = cfgmod.load()
+    fs = load_feishu_config(cfg)
+    if not fs.configured:
+        console.print("[red]缺少飞书凭证[/red]")
+        console.print("先运行 [cyan]pyagent feishu-setup[/cyan]，或设置环境变量 FEISHU_APP_ID / FEISHU_APP_SECRET")
+        raise typer.Exit(1)
+
+    # 凭证文件可能损坏，不能让 JSONDecodeError 冒成堆栈
+    try:
+        has_model_auth = bool(json.loads(cfg.pi_auth.read_text() or "{}")) if cfg.pi_auth.is_file() else False
+    except (json.JSONDecodeError, OSError) as exc:
+        console.print(f"[red]读取 pi 凭证失败[/red]：{exc}")
+        console.print("修复：重新运行 [cyan]pyagent adopt-codex-auth[/cyan]（可用 --revert 回退）")
+        raise typer.Exit(1) from exc
+    if not has_model_auth:
+        console.print("[red]pi 未配置模型凭证[/red] —— 先运行 [cyan]pyagent adopt-codex-auth[/cyan]")
+        raise typer.Exit(1)
+
+    orch = Orchestrator(cfg, fs, model=model)
+    console.print("[green]正在连接飞书[/green]（长连接，无需公网 IP）…")
+    console.print(f"[dim]主控对话：{fs.default_chat or '未设置 —— 在飞书给机器人发一句话即自动绑定'}[/dim]")
+    console.print("[dim]Ctrl+C 退出[/dim]\n")
+    try:
+        orch.run()
+    except KeyboardInterrupt:
+        console.print("\n正在退出…")
+    except Exception as exc:
+        # 常见于凭证无效、应用未发布、网络不通
+        console.print(f"[red]飞书连接失败[/red]：{type(exc).__name__}: {exc}")
+        console.print(
+            "[dim]排查：凭证是否正确、应用是否已发布、"
+            "「事件与回调」是否选了长连接并订阅 im.message.receive_v1[/dim]"
+        )
+        raise typer.Exit(1) from exc
+    finally:
+        orch.stop()
+
+
 def main() -> None:
     app()
 

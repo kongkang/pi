@@ -53,6 +53,10 @@ class FeishuAdapter:
         # decision_id → 卡片所在 message_id，用于决策落定后更新卡片
         self._decision_msgs: dict[str, str] = {}
         self._lock = threading.Lock()
+        # notify / request_decision / close_decision 会被 worker 线程与 pi_rpc 的
+        # UI 线程并发调用。lark_oapi.Client 未声明线程安全，故串行化所有 HTTP 调用 ——
+        # 发消息不是热路径，串行的代价可以忽略。
+        self._api_lock = threading.Lock()
         # 去重：飞书事件可能重投，同一 message_id 只处理一次
         self._seen_messages: set[str] = set()
 
@@ -215,7 +219,8 @@ class FeishuAdapter:
             )
             .build()
         )
-        self._api.im.v1.message.patch(req)
+        with self._api_lock:
+            self._api.im.v1.message.patch(req)
 
     def _send(self, receive_id: str, msg_type: str, content: str) -> str:
         """发消息，返回 message_id（失败返回空串）。"""
@@ -233,7 +238,8 @@ class FeishuAdapter:
             )
             .build()
         )
-        resp = self._api.im.v1.message.create(req)
+        with self._api_lock:
+            resp = self._api.im.v1.message.create(req)
         if not resp.success():
             lark.logger.error(f"飞书发消息失败 code={resp.code} msg={resp.msg}")
             return ""
