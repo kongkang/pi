@@ -352,6 +352,193 @@ def ask(
     console.print(answer or "[dim](空回复)[/dim]")
 
 
+@app.command()
+def recall(
+    project: str = typer.Argument(..., help="项目名或路径"),
+    limit: int = typer.Option(2, "--limit", "-n", help="还原几个会话"),
+) -> None:
+    """还原某项目历史会话的上下文 —— 「这对话当初要干什么、现在到哪了」。"""
+    from . import context as ctxmod
+
+    cfg = cfgmod.load()
+    cand = Path(project).expanduser()
+    path = (cand if cand.is_absolute() else cfg.projects_root / project).resolve()
+    if not path.is_dir():
+        console.print(f"[red]目录不存在：{path}[/red]")
+        raise typer.Exit(1)
+
+    found = ctxmod.find_sessions(path)
+    if not found:
+        console.print(f"[yellow]没找到 {path.name} 的历史会话[/yellow]")
+        console.print("[dim]已查：pi / Claude Code / Codex 三处会话目录[/dim]")
+        return
+
+    by_engine: dict[str, int] = {}
+    for engine, _ in found:
+        by_engine[engine] = by_engine.get(engine, 0) + 1
+    console.print(
+        f"[dim]{path.name} 找到 "
+        + "、".join(f"{k} {v} 个" for k, v in by_engine.items())
+        + " 会话[/dim]\n"
+    )
+
+    digests = ctxmod.recall(path, limit=limit)
+    if not digests:
+        console.print("[yellow]会话文件存在但无法解析出对话内容[/yellow]")
+        return
+    for d in digests:
+        console.print(d.render())
+        console.print()
+
+
+@app.command()
+def dispatch(
+    project: str = typer.Argument(..., help="派给哪个项目"),
+    task: str = typer.Argument(..., help="要它做什么"),
+    engine: str = typer.Option(
+        "", "--engine", "-e", help="pi / codex / claude（不指定则用 pi 并在回执标注）"
+    ),
+) -> None:
+    """把任务派到某个项目目录的子会话 —— Pi 自己不执行，只编排。"""
+    from .dispatcher import ENGINES, Dispatcher
+    from .store import Store
+
+    cfg = cfgmod.load()
+    st = Store(cfg.db_path)
+
+    if engine and engine.lower() not in ENGINES:
+        console.print(f"[red]未知引擎 {engine}[/red]，可选：{'/'.join(ENGINES)}")
+        raise typer.Exit(1)
+
+    def on_ui(req: dict) -> dict | None:
+        console.print(f"\n[yellow]⚠ 子 Agent 请求决策[/yellow] {req.get('title')}")
+        console.print("  [dim]本地 CLI 模式按安全默认拒绝；接入飞书后可点按钮批准。[/dim]")
+        return None
+
+    disp = Dispatcher(cfg, st, ui_handler=on_ui)
+    try:
+        # CLI 是一次性进程，必须同步等完 —— 后台线程会随进程退出被杀，
+        # 任务会永远卡在 running。真正的异步派活由 serve 守护进程承担。
+        t = disp.dispatch(project, task, engine=engine.lower() or None, wait=True)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    fresh = st.get_task(t.id)
+    if fresh is None:
+        console.print("[red]任务记录丢失[/red]")
+        raise typer.Exit(1)
+
+    tag = f"{fresh.engine}{'（未指定，已用默认）' if fresh.engine_default else ''}"
+    console.print(f"[dim]任务 {fresh.id} · {fresh.project} · 引擎 {tag} · "
+                  f"耗时 {fresh.running_seconds:.0f}s[/dim]\n")
+    if fresh.state == "done":
+        console.print(fresh.result or "[dim](空结果)[/dim]")
+    else:
+        console.print(f"[red]状态 {fresh.state}[/red]：{fresh.error or '无错误信息'}")
+        raise typer.Exit(1)
+
+
+@app.command()
+def tasks(
+    project: str = typer.Option("", "--project", "-p", help="只看某项目"),
+    active: bool = typer.Option(False, "--active", help="只看未结束的"),
+    limit: int = typer.Option(20, "--limit", "-n"),
+) -> None:
+    """列出派出去的任务。"""
+    from .store import Store
+
+    cfg = cfgmod.load()
+    st = Store(cfg.db_path)
+    reaped = st.reap_stale()
+    if reaped:
+        console.print(f"[yellow]回收了 {len(reaped)} 个心跳超时的任务[/yellow]")
+
+    items = st.tasks(project=project or None, active_only=active, limit=limit)
+    if not items:
+        console.print("[dim]还没有任务记录。用 pyagent dispatch 派一个。[/dim]")
+        return
+
+    colors = {"done": "green", "running": "cyan", "pending": "yellow",
+              "blocked": "magenta", "failed": "red", "timeout": "red"}
+    table = Table("任务", "项目", "引擎", "状态", "耗时", "内容")
+    for t in items:
+        c = colors.get(t.state, "white")
+        table.add_row(
+            t.id, t.project,
+            t.engine + ("*" if t.engine_default else ""),
+            f"[{c}]{t.state}[/{c}]",
+            f"{t.running_seconds:.0f}s" if t.started_at else "-",
+            t.summary(),
+        )
+    console.print(table)
+    console.print("[dim]引擎带 * 表示派活时未指定、用了默认值[/dim]")
+
+
+@app.command()
+def status() -> None:
+    """项目进度全景：git 状态 × 编排任务状态。"""
+    from .store import Store
+
+    cfg = cfgmod.load()
+    st = Store(cfg.db_path)
+    st.reap_stale()
+
+    rollup = {r["project"]: r for r in st.project_rollup()}
+    items = registry.scan(cfg.projects_root)
+
+    table = Table("项目", "最近提交", "分支", "未提交", "在跑", "待决策", "已完成", "失败")
+    shown = 0
+    for p in items:
+        r = rollup.get(p.name)
+        # 没有任何编排记录且近期无提交的项目就不占屏
+        if r is None and (p.last_commit_date or "") < "2026-06":
+            continue
+        table.add_row(
+            p.name,
+            p.last_commit_date or "-",
+            (p.branch or "-")[:22],
+            str(p.dirty_files) if p.dirty_files else "",
+            str(r["running"] or "") if r else "",
+            str(r["blocked"] or "") if r else "",
+            str(r["done"] or "") if r else "",
+            str(r["failed"] or "") if r else "",
+        )
+        shown += 1
+    console.print(table)
+    console.print(f"[dim]显示 {shown} 个（近期活跃或有编排记录），共扫描 {len(items)} 个项目[/dim]")
+
+
+@app.command("log")
+def show_log(
+    task_id: str = typer.Option("", "--task-id", "-t", help="只看某任务"),
+    limit: int = typer.Option(40, "--limit", "-n"),
+) -> None:
+    """事件流回放 —— 排障时定位是哪一层出的问题。"""
+    import time as _time
+
+    from .store import Store
+
+    cfg = cfgmod.load()
+    st = Store(cfg.db_path)
+    evts = st.events(task_id=task_id or None, limit=limit)
+    if not evts:
+        console.print("[dim]暂无事件[/dim]")
+        return
+    table = Table("时间", "层", "事件", "任务", "详情")
+    for e in evts:
+        sev = e["severity"]
+        color = {"warning": "yellow", "error": "red"}.get(sev, "white")
+        table.add_row(
+            _time.strftime("%m-%d %H:%M:%S", _time.localtime(e["at"])),
+            e["layer"],
+            f"[{color}]{e['kind']}[/{color}]",
+            (e["task_id"] or "")[:10],
+            (e["detail"] or "")[:60],
+        )
+    console.print(table)
+
+
 @app.command("feishu-setup")
 def feishu_setup(
     app_id: str = typer.Option(..., "--app-id", prompt="飞书 App ID"),
