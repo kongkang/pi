@@ -539,6 +539,46 @@ def show_log(
     console.print(table)
 
 
+@app.command("computer-use")
+def computer_use_cmd(
+    instruction: str = typer.Argument(
+        "", help="要做的 GUI 操作，例如「在 Chrome 的权限弹窗里点 Allow」"
+    ),
+    check_only: bool = typer.Option(False, "--check", help="只体检，不执行"),
+) -> None:
+    """替你做 GUI 上的机械操作（点浏览器 Allow/Access 之类）。
+
+    走 codex 已启用的官方 computer-use 插件。注意这条路径不套内核沙箱，
+    因为 GUI 操作需要访问系统 —— 只用于人工替代操作，别拿它跑开发任务。
+    """
+    from . import computer_use as cu
+
+    avail = cu.check()
+    style = "green" if avail.ok else "red"
+    console.print(f"[{style}]{'可用' if avail.ok else '不可用'}[/{style}]：{avail.detail}")
+
+    if avail.ok and check_only:
+        tools = cu.mcp_tools()
+        if tools:
+            console.print(f"[dim]提供 {len(tools)} 个工具：{', '.join(tools)}[/dim]")
+        else:
+            console.print("[yellow]MCP server 未返回工具列表（可能首次启动较慢）[/yellow]")
+    if check_only:
+        raise typer.Exit(0 if avail.ok else 1)
+    if not avail.ok:
+        raise typer.Exit(1)
+    if not instruction.strip():
+        console.print("[red]请给出要做的操作[/red]，或用 --check 只做体检")
+        raise typer.Exit(1)
+
+    console.print("[yellow]⚠ 即将操作你的桌面[/yellow]，请不要同时使用鼠标键盘\n")
+    try:
+        console.print(cu.run(instruction))
+    except RuntimeError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+
 @app.command("feishu-setup")
 def feishu_setup(
     app_id: str = typer.Option(..., "--app-id", prompt="飞书 App ID"),
