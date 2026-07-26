@@ -64,6 +64,11 @@ class Config:
         return self.repo_root / "packages" / "coding-agent" / "dist" / "cli.js"
 
     @property
+    def guard_extension(self) -> Path:
+        """授信守卫扩展。用 -e 显式加载，故不受项目信任开关影响。"""
+        return self.repo_root / "pyagent" / "extensions" / "guard.ts"
+
+    @property
     def pi_auth(self) -> Path:
         """pi 的凭证文件；Codex 订阅 OAuth token 存在这里。"""
         return Path.home() / ".pi" / "agent" / "auth.json"

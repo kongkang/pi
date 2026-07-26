@@ -20,6 +20,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
+from . import sandbox
 from .config import Config
 
 # 已知的 fire-and-forget UI 方法：这些不需要（也不能）回响应。
@@ -67,6 +68,11 @@ class PiSession:
         name: str | None = None,
         no_session: bool = False,
         trust_project: bool = False,
+        guard: bool = True,
+        # 默认开启：编排器要无人看管地自动推进，而实测证明守卫层可被解释器绕过，
+        # 只有内核边界拦得住。宁可少数场景需要显式关掉，也不裸奔。
+        sandboxed: bool = True,
+        sandbox_extra_writable: list[Path] | None = None,
         extra_args: list[str] | None = None,
         ui_handler: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
     ) -> None:
@@ -80,6 +86,14 @@ class PiSession:
         # 默认 False 并显式传 --no-approve：项目本地 extension 是任意 TS 代码执行通道，
         # 编排器要在几十个项目目录里跑，绝不能依赖全局 defaultProjectTrust 的默认值。
         self.trust_project = trust_project
+        # 是否加载授信守卫扩展（tool_call 执行前拦截越界操作）。
+        # 注意：守卫是"提醒层"而非安全边界 —— 命令文本黑名单可被解释器绕过，
+        # 已实测（rm -rf 被拦后模型改用 python os.remove 成功）。真边界靠 sandboxed。
+        self.guard = guard
+        # 是否用 macOS 内核沙箱强制写入边界（真正的边界）
+        self.sandboxed = sandboxed
+        self.sandbox_extra_writable = sandbox_extra_writable or []
+        self._profile_path: Path | None = None
         self.extra_args = extra_args or []
         # 授信升级钩子：收到 dialog 类 UI 请求时调用，返回要回传的 payload。
         # 未提供时默认取消（不自动批准危险操作）。
@@ -118,8 +132,36 @@ class PiSession:
             argv += ["--name", _reject_option_like("name", self.name)]
         # 显式表态，不依赖全局 defaultProjectTrust 的当前值
         argv.append("--approve" if self.trust_project else "--no-approve")
+        # 守卫用 -e 加载：这类扩展在项目信任解析之前就生效，不会被 --no-approve 挡掉
+        if self.guard and self.cfg.guard_extension.is_file():
+            argv += ["-e", str(self.cfg.guard_extension)]
         argv += self.extra_args
+
+        if self.sandboxed:
+            argv = self._wrap_sandbox(argv)
         return argv
+
+    def _wrap_sandbox(self, argv: list[str]) -> list[str]:
+        """套上内核写入边界。沙箱不可用或自检不通过时拒绝启动。
+
+        宁可起不来也不能"以为有边界其实没有" —— 那比没有沙箱更危险。
+        """
+        if not sandbox.available():
+            raise PiRpcError("要求沙箱但本机没有 sandbox-exec")
+
+        state = self.cfg.state_dir / "sandbox"
+        state.mkdir(parents=True, exist_ok=True)
+        writable = sandbox.writable_paths(self.cwd, extra=self.sandbox_extra_writable)
+        profile = state / f"profile-{abs(hash(str(self.cwd))) % 10**10}.sb"
+        profile.write_text(sandbox.build_profile(writable))
+        self._profile_path = profile
+
+        # 用一个必然在边界外的路径做自检
+        ok, detail = sandbox.self_check(profile, Path.home() / ".pyagent-sandbox-selfcheck")
+        if not ok:
+            raise PiRpcError(f"沙箱自检未通过，拒绝启动：{detail}")
+
+        return sandbox.wrap(argv, profile)
 
     def start(self) -> None:
         self._proc = subprocess.Popen(

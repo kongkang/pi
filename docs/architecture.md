@@ -51,21 +51,28 @@ pi (TypeScript) —— Agent 引擎，模型额度走 Codex 订阅 OAuth
 各项目目录（子 Agent 在此干活）
 ```
 
-## 授信边界的实现路径
+## 授信边界：两层，详见 security-model.md
 
-pi 的 README 明确说明它**不含内置权限系统**，默认以启动者权限运行。因此授信边界
-不能依赖 pi 自身，而是落在 extension 拦截点上：
+完整推导与实测记录见 [security-model.md](security-model.md)。要点：
 
-1. 写一个 pi extension（TS），拦截危险 `tool_call`
-2. 判定越界（路径归一化、高危命令模式）
-3. 越界时调 `ctx.ui.select("允许？", ["Allow","Block"])`
-4. 在 RPC 模式下它变成 `extension_ui_request` 发到 PyAgent
-5. PyAgent 转飞书卡片按钮 → 用户点选 → 回 `extension_ui_response`
+**只靠 extension 拦命令文本是不成立的。** 实测中守卫拦掉 `rm -rf <file>` 后，
+模型立刻改用 `python -c "os.remove(...)"` 并成功删除了目标 —— 任何解释器都能
+绕过文本黑名单。
 
-这是**真正的执行前拦截**，比事后判定事件流可靠。
+因此改为两层，职责不同：
 
-安全默认：`pi_rpc.py` 在没有 UI 处理器或处理器异常时，一律回 `cancelled: true`，
-绝不自动批准。宁可卡住也不误批。
+1. **内核层（真边界，默认开启）**：`sandbox-exec` 强制写入白名单 —— 只允许写
+   当前项目、`~/.pi`、临时目录与包缓存。不含项目根 `~/Developer`，也不含凭证目录。
+   同一个 python 绕过手法在这一层拿到 `PermissionError`。
+   启动前必做自检，不通过就拒绝开会话。
+2. **守卫层（提醒层）**：pi extension 拦 `tool_call`，把「这操作要不要问你」
+   送到飞书卡片。它管的是 `git push`、`npm publish` 这类权限上合法但你该知情的操作 ——
+   内核沙箱表达不了这个语义。
+
+这也把「跨项目操作硬禁止」从约定变成了内核强制。
+
+安全默认：无处理器 / 处理器异常 / 超时 / 未知 dialog 方法，一律不批准。
+宁可卡住也不误批。
 
 ## Computer Use
 

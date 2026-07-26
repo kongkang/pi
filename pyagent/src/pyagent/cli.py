@@ -290,6 +290,11 @@ def ask(
     allow_any_path: bool = typer.Option(
         False, "--allow-any-path", help="允许 --project 指向项目根之外的目录（默认禁止）"
     ),
+    sandboxed: bool = typer.Option(
+        True,
+        "--sandbox/--no-sandbox",
+        help="内核沙箱强制写入边界，只允许写当前项目（默认开启）",
+    ),
 ) -> None:
     """通过 pi RPC 真实跑一轮 —— 用于验证 Codex 订阅链路是否打通。"""
     cfg = cfgmod.load()
@@ -323,6 +328,7 @@ def ask(
         model=model or None,
         no_session=not session,
         session_id=session or None,
+        sandboxed=sandboxed,
         ui_handler=on_ui,
     ) as s:
         try:
