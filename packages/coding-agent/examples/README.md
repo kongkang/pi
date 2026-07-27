@@ -18,6 +18,9 @@ Example extensions demonstrating:
 - External integrations (SSH, file watchers, system theme sync)
 - Custom providers (Anthropic with custom streaming, GitLab Duo)
 
+### [feishu-gateway/](feishu-gateway/)
+Single-user bridge from the official Feishu CLI event stream to Pi RPC mode, with sender/chat allowlists, persistent sessions, and a macOS LaunchAgent installer.
+
 ## Documentation
 
 - [SDK Reference](sdk/README.md)

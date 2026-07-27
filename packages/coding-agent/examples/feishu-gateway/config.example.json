@@ -1,0 +1,22 @@
+{
+  "app_id": "cli_REPLACE_ME",
+  "allow_from": [
+    "ou_REPLACE_ME"
+  ],
+  "admin_from": [
+    "ou_REPLACE_ME"
+  ],
+  "direct_chat_id": "oc_REPLACE_ME",
+  "state_dir": "~/.pi/agent/feishu-gateway",
+  "lark_cli_command": "lark-cli",
+  "pi": {
+    "command": "pi",
+    "cwd": "/absolute/path/to/your/workspace",
+    "session_dir": "~/.pi/agent/feishu-gateway/sessions",
+    "session_id": "feishu-one-api",
+    "session_name": "Feishu: One-Api",
+    "approve_project": false,
+    "response_timeout_ms": 600000,
+    "system_prompt": "You are Pi in a private Feishu direct chat. Keep replies concise and suitable for chat. Only use tools when needed. Before destructive actions or external communications, require explicit confirmation unless the current user message already explicitly requests that exact action."
+  }
+}
