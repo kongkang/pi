@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added a dual-profile Playwright browser extension example with isolated persistent agent and delegated Chrome environments, human takeover, and an end-to-end smoke test.
+
 ## [0.82.1] - 2026-07-25
 
 ### New Features
