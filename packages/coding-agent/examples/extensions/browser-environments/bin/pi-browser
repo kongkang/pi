@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  pi-browser <agent|delegated> open [url]
+  pi-browser <agent|delegated> <playwright-cli command> [args...]
+  pi-browser <agent|delegated> reset --yes
+  pi-browser status
+  pi-browser dashboard
+
+Profiles are stored below ${PI_BROWSER_HOME:-${PI_CODING_AGENT_DIR:-~/.pi/agent}/browser}.
+EOF
+}
+
+require_playwright() {
+  if ! command -v playwright-cli >/dev/null 2>&1; then
+    echo "playwright-cli is not installed; run browser-environments/install.sh" >&2
+    exit 127
+  fi
+}
+
+browser_root="${PI_BROWSER_HOME:-${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/browser}"
+
+if [[ $# -eq 0 ]]; then
+  usage
+  exit 2
+fi
+
+case "$1" in
+  status)
+    require_playwright
+    exec playwright-cli list --all
+    ;;
+  dashboard)
+    require_playwright
+    install -d -m 700 "$browser_root/output"
+    cd "$browser_root/output"
+    exec playwright-cli show
+    ;;
+  agent|delegated)
+    environment="$1"
+    shift
+    ;;
+  -h|--help|help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "unknown browser environment or command: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if [[ $# -eq 0 ]]; then
+  usage
+  exit 2
+fi
+
+require_playwright
+command_name="$1"
+shift
+session_prefix="${PI_BROWSER_SESSION_PREFIX:-pi-browser}"
+session="$session_prefix-$environment"
+profile="$browser_root/profiles/$environment"
+output="$browser_root/output/$environment"
+umask 077
+install -d -m 700 "$profile" "$output"
+
+case "$command_name" in
+  attach|detach|install|install-browser|list|close-all|kill-all|delete-data|show)
+    echo "command '$command_name' is disabled because it can escape or destroy the isolated browser environment" >&2
+    exit 2
+    ;;
+  reset)
+    if [[ "${1:-}" != "--yes" ]]; then
+      echo "reset requires --yes" >&2
+      exit 2
+    fi
+    (
+      cd "$output"
+      playwright-cli "-s=$session" close >/dev/null 2>&1 || true
+    )
+    rm -rf -- "$profile" "$output"
+    install -d -m 700 "$profile" "$output"
+    echo "reset $environment browser environment"
+    exit 0
+    ;;
+  open)
+    for argument in "$@"; do
+      case "$argument" in
+        --browser|--browser=*|--config|--config=*|--headed|--headed=*|--persistent|--persistent=*|--profile|--profile=*)
+          echo "open option '$argument' is managed by pi-browser" >&2
+          exit 2
+          ;;
+      esac
+    done
+    if [[ $# -eq 0 ]]; then
+      set -- about:blank
+    fi
+    open_options=(--browser=chrome "--profile=$profile")
+    if [[ "${PI_BROWSER_HEADED:-1}" != "0" ]]; then
+      open_options+=(--headed)
+    fi
+    cd "$output"
+    exec playwright-cli "-s=$session" open "$@" "${open_options[@]}"
+    ;;
+  *)
+    cd "$output"
+    exec playwright-cli "-s=$session" "$command_name" "$@"
+    ;;
+esac
