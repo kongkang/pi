@@ -10,6 +10,7 @@ import { ProjectTrustStore } from "../src/core/trust-manager.ts";
 import { main } from "../src/main.ts";
 import { ConfigSelectorComponent } from "../src/modes/interactive/components/config-selector.ts";
 import { handlePackageCommand } from "../src/package-manager-cli.ts";
+import { allowNetwork } from "./test-network-env.ts";
 
 describe("package commands", () => {
 	let tempDir: string;
@@ -51,6 +52,7 @@ describe("package commands", () => {
 	}
 
 	beforeEach(() => {
+		allowNetwork();
 		tempDir = join(tmpdir(), `pi-package-commands-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 		agentDir = join(tempDir, "agent");
 		projectDir = join(tempDir, "project");
@@ -384,6 +386,7 @@ describe("package commands", () => {
 			authPath: join(agentDir, "auth.json"),
 			modelsPath: join(agentDir, "models.json"),
 			allowModelNetwork: false,
+			signal: expect.any(AbortSignal),
 		});
 		expect(refresh).toHaveBeenCalledWith({
 			allowNetwork: true,
@@ -493,6 +496,30 @@ describe("package commands", () => {
 			} else {
 				process.env.PI_SKIP_VERSION_CHECK = previousSkipVersionCheck;
 			}
+		}
+	});
+
+	it("retries a transient self-update version check", async () => {
+		const previousSkipVersionCheck = process.env.PI_SKIP_VERSION_CHECK;
+		delete process.env.PI_SKIP_VERSION_CHECK;
+		const fetchMock = vi
+			.fn()
+			.mockRejectedValueOnce(new Error("fetch failed"))
+			.mockRejectedValueOnce(new Error("fetch failed"))
+			.mockResolvedValueOnce(Response.json({ version: VERSION }));
+		vi.stubGlobal("fetch", fetchMock);
+		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+		try {
+			await expect(runPackageCommandDirectly(["update", "--self"])).resolves.toBeUndefined();
+			expect(fetchMock).toHaveBeenCalledTimes(3);
+			expect(errorSpy).not.toHaveBeenCalled();
+		} finally {
+			if (previousSkipVersionCheck === undefined) delete process.env.PI_SKIP_VERSION_CHECK;
+			else process.env.PI_SKIP_VERSION_CHECK = previousSkipVersionCheck;
+			logSpy.mockRestore();
+			errorSpy.mockRestore();
 		}
 	});
 

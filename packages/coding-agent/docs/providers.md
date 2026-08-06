@@ -48,6 +48,7 @@ Anthropic subscription auth is active for Claude Pro/Max accounts. Third-party h
 
 - Run `/login openrouter`, then select **Sign in with OpenRouter** to open the OpenRouter PKCE authorization flow
 - The authorization creates a user-controlled OpenRouter API key billed from your OpenRouter credits
+- On remote/headless machines (e.g. over SSH) the browser cannot reach the loopback callback; paste the final redirect URL (or the authorization code) into the login prompt instead
 - `OPENROUTER_API_KEY` remains available through **Use an API key**
 
 ### Radius
@@ -92,6 +93,7 @@ pi
 | Hugging Face | `HF_TOKEN` | `huggingface` |
 | Fireworks | `FIREWORKS_API_KEY` | `fireworks` |
 | Together AI | `TOGETHER_API_KEY` | `together` |
+| Baseten | `BASETEN_API_KEY` | `baseten` |
 | Kimi For Coding | `KIMI_API_KEY` | `kimi-coding` |
 | MiniMax | `MINIMAX_API_KEY` | `minimax` |
 | MiniMax (China) | `MINIMAX_CN_API_KEY` | `minimax-cn` |

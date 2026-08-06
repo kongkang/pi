@@ -154,7 +154,7 @@ describe("AI Providers Abort Tests", () => {
 	});
 
 	describe.skipIf(!process.env.ANTHROPIC_OAUTH_TOKEN)("Anthropic Provider Abort", () => {
-		const llm = getModel("anthropic", "claude-opus-4-1-20250805");
+		const llm = getModel("anthropic", "claude-sonnet-4-6");
 
 		it("should abort mid-stream", { retry: 3 }, async () => {
 			await testAbortSignal(llm, { thinkingEnabled: true, thinkingBudgetTokens: 2048 });
@@ -179,6 +179,18 @@ describe("AI Providers Abort Tests", () => {
 
 	describe.skipIf(!process.env.TOGETHER_API_KEY)("Together AI Provider Abort", () => {
 		const llm = getModel("together", "moonshotai/Kimi-K2.6");
+
+		it("should abort mid-stream", { retry: 3 }, async () => {
+			await testAbortSignal(llm, { reasoningEffort: "high" });
+		});
+
+		it("should handle immediate abort", { retry: 3 }, async () => {
+			await testImmediateAbort(llm, { reasoningEffort: "high" });
+		});
+	});
+
+	describe.skipIf(!process.env.BASETEN_API_KEY)("Baseten Provider Abort", () => {
+		const llm = getModel("baseten", "zai-org/GLM-5.2");
 
 		it("should abort mid-stream", { retry: 3 }, async () => {
 			await testAbortSignal(llm, { reasoningEffort: "high" });
