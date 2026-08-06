@@ -71,6 +71,7 @@ pi
 | Ant Ling | `ANT_LING_API_KEY` | `ant-ling` |
 | Azure OpenAI Responses | `AZURE_OPENAI_API_KEY` | `azure-openai-responses` |
 | OpenAI | `OPENAI_API_KEY` | `openai` |
+| CloudOS | `CLOUDOS_API_KEY` | `cloudos` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `deepseek` |
 | NVIDIA NIM | `NVIDIA_API_KEY` | `nvidia` |
 | Google Gemini | `GEMINI_API_KEY` | `google` |
@@ -112,6 +113,7 @@ Store credentials in `~/.pi/agent/auth.json`:
   "anthropic": { "type": "api_key", "key": "sk-ant-..." },
   "ant-ling": { "type": "api_key", "key": "..." },
   "openai": { "type": "api_key", "key": "sk-..." },
+  "cloudos": { "type": "api_key", "key": "sk-..." },
   "deepseek": { "type": "api_key", "key": "sk-..." },
   "nvidia": { "type": "api_key", "key": "nvapi-..." },
   "google": { "type": "api_key", "key": "..." },

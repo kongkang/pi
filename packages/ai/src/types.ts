@@ -64,6 +64,7 @@ export type KnownProvider =
 	| "kimi-coding"
 	| "cloudflare-workers-ai"
 	| "cloudflare-ai-gateway"
+	| "cloudos"
 	| "qwen-token-plan"
 	| "qwen-token-plan-cn"
 	| "xiaomi"

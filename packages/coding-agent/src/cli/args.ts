@@ -343,6 +343,7 @@ ${chalk.bold("Environment Variables:")}
   AZURE_OPENAI_RESOURCE_NAME       - Azure OpenAI resource name (alternative to base URL)
   AZURE_OPENAI_API_VERSION         - Azure OpenAI API version (default: v1)
   AZURE_OPENAI_DEPLOYMENT_NAME_MAP - Azure OpenAI model=deployment map (comma-separated)
+  CLOUDOS_API_KEY                  - CloudOS inference gateway API key
   DEEPSEEK_API_KEY                 - DeepSeek API key
   NVIDIA_API_KEY                   - NVIDIA NIM API key
   GEMINI_API_KEY                   - Google Gemini API key

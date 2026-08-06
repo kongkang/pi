@@ -6,6 +6,7 @@
 
 - Added a dual-profile Playwright browser extension example with isolated persistent agent and delegated Chrome environments, human takeover, and an end-to-end smoke test.
 - Added a single-user Feishu gateway example using the official lark-cli event stream and Pi RPC mode.
+- Added the `cloudos` provider (CloudOS inference gateway) with `deepseek-v4-flash`, authenticated via `CLOUDOS_API_KEY`. See [Providers](docs/providers.md#api-keys).
 
 ## [0.82.1] - 2026-07-25
 

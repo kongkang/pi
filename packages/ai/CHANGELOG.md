@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added the `cloudos` provider (CloudOS inference gateway) serving `deepseek-v4-flash` via the OpenAI Completions API. The gateway rejects `thinking`/`reasoning_effort` request params, so models stream always-on `reasoning_content` without sending reasoning controls.
 ## [0.82.1] - 2026-07-25
 
 ### Added

@@ -788,7 +788,7 @@ function applyThinkingLevelMetadata(model: Model<any>): void {
 	if (model.api === "anthropic-messages" && isAnthropicTemperatureUnsupportedModel(model.id)) {
 		mergeAnthropicMessagesCompat(model, { supportsTemperature: false });
 	}
-	if (model.api === "openai-completions" && model.id.includes("deepseek-v4")) {
+	if (model.api === "openai-completions" && model.id.includes("deepseek-v4") && model.provider !== "cloudos") {
 		mergeThinkingLevelMap(
 			model,
 			model.provider === "openrouter"
@@ -2271,8 +2271,46 @@ async function generateModels() {
 	];
 	allModels.push(...antLingModels);
 
+	// CloudOS inference gateway (https://api-inference.cn.cloudos.com) is a
+	// LiteLLM proxy fronting Ollama. Its /v1/models endpoint requires auth and
+	// is not listed on models.dev, so the catalog is maintained here. The proxy
+	// rejects `thinking` and `reasoning_effort` request params even though
+	// deepseek-v4-flash streams `reasoning_content` unconditionally, so requests
+	// must omit both (supportsReasoningEffort: false) while still capturing the
+	// always-on reasoning output.
+	const CLOUDOS_BASE_URL = "https://api-inference.cn.cloudos.com/v1";
+	const cloudosCompat: OpenAICompletionsCompat = {
+		supportsStore: false,
+		supportsDeveloperRole: false,
+		supportsReasoningEffort: false,
+		maxTokensField: "max_tokens",
+		supportsStrictMode: false,
+		supportsLongCacheRetention: false,
+	};
+	const cloudosModels: Model<"openai-completions">[] = [
+		{
+			id: "deepseek-v4-flash",
+			name: "DeepSeek V4 Flash",
+			api: "openai-completions",
+			baseUrl: CLOUDOS_BASE_URL,
+			provider: "cloudos",
+			reasoning: true,
+			thinkingLevelMap: { off: null },
+			input: ["text"],
+			cost: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+			compat: cloudosCompat,
+		},
+	];
+	allModels.push(...cloudosModels);
+
 	for (const candidate of allModels) {
-		if (candidate.api === "openai-completions" && candidate.id.includes("deepseek-v4")) {
+		if (
+			candidate.api === "openai-completions" &&
+			candidate.id.includes("deepseek-v4") &&
+			candidate.provider !== "cloudos"
+		) {
 			const preservesNativeReasoningEffort = candidate.provider === "openrouter" || candidate.provider === "opencode";
 			candidate.compat = {
 				...candidate.compat,

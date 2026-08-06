@@ -108,6 +108,7 @@ For each built-in provider, pi maintains a list of tool-capable models. Configur
 - Ant Ling
 - OpenAI
 - Azure OpenAI
+- CloudOS
 - DeepSeek
 - NVIDIA NIM
 - Google Gemini
