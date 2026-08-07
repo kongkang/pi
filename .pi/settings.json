@@ -1,0 +1,8 @@
+{
+  "theme": "dark",
+  "defaultProvider": "cloudos",
+  "defaultModel": "glm-5.2",
+  "defaultThinkingLevel": "high",
+  "hideThinkingBlock": true,
+  "enableSkillCommands": true
+}
