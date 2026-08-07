@@ -69,6 +69,7 @@ export type KnownProvider =
 	| "cloudos"
 	| "qwen-token-plan"
 	| "qwen-token-plan-cn"
+	| "qwen-token-plan-individual"
 	| "xiaomi"
 	| "xiaomi-token-plan-cn"
 	| "xiaomi-token-plan-ams"

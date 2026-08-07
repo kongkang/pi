@@ -4,6 +4,19 @@
 
 ### Added
 
+- Added unbound half-page transcript scrolling actions, `tui.altScreen.halfPageUp` and `tui.altScreen.halfPageDown`, for fullscreen TUI keybindings ([#7735](https://github.com/earendil-works/pi/issues/7735)).
+- Added double-click word selection, word-aware drag selection, and triple-click line selection in the fullscreen TUI ([#7725](https://github.com/earendil-works/pi/issues/7725)).
+- Added an optional right-click paste handler to the alternate-screen TUI, currently enabled on Windows.
+
+### Fixed
+
+- Fixed LaTeX relation, multiplication, and named-operator spacing, and correctly composed matrices with stacked fractions, operator limits, and adjacent matrices.
+- Reduced fullscreen mouse event volume under tmux, Zellij, and GNU Screen by using button-motion tracking instead of all-motion tracking.
+
+## [0.84.0] - 2026-08-06
+
+### Added
+
 - Added terminal-friendly Unicode rendering for LaTeX expressions in Markdown, including inline and display math, fractions, scripts, common symbols, aligned equations, cases, and matrices.
 - Added the shared `TuiMode` type and `mode` discriminants to the main-screen and alternate-screen TUI renderers.
 - Added TUI lifecycle and render-state handoff APIs for replacing renderers without replaying main-screen content.
