@@ -68,7 +68,7 @@
 
 ### Added
 
-- Added the `cloudos` provider (CloudOS inference gateway) serving `deepseek-v4-flash` via the OpenAI Completions API. The gateway rejects `thinking`/`reasoning_effort` request params, so models stream always-on `reasoning_content` without sending reasoning controls.
+- Added the `cloudos` provider (CloudOS inference gateway) serving `deepseek-v4-flash`, `gemma4:e2b`, and `qwen2.5vl:7b` via the OpenAI Completions API. The gateway does not honor `thinking`/`reasoning_effort` request params, so reasoning-capable models stream always-on `reasoning_content` without sending reasoning controls. The embedding-only `nomic-embed-text` model is excluded.
 - Added optional `OAuthAuth.isSubscription` metadata for distinguishing subscription-backed authentication from generic OAuth sign-in.
 - Added explicit `TelemetryContext` propagation across stream, deferred, and image request options using the vendor-neutral `@earendil-works/pi-telemetry` contract.
 - Added deferred provider request contracts, durable response handles, authenticated fetch/cancel dispatch, and faux-provider support for pending, ready, failed, and cancelled responses ([#7339](https://github.com/earendil-works/pi/pull/7339) by [@davidbrai](https://github.com/davidbrai)).

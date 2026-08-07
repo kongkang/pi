@@ -2449,10 +2449,12 @@ async function generateModels() {
 	// CloudOS inference gateway (https://api-inference.cn.cloudos.com) is a
 	// LiteLLM proxy fronting Ollama. Its /v1/models endpoint requires auth and
 	// is not listed on models.dev, so the catalog is maintained here. The proxy
-	// rejects `thinking` and `reasoning_effort` request params even though
-	// deepseek-v4-flash streams `reasoning_content` unconditionally, so requests
-	// must omit both (supportsReasoningEffort: false) while still capturing the
-	// always-on reasoning output.
+	// does not honor `thinking`/`reasoning_effort` request params (it silently
+	// drops them) even though deepseek-v4-flash and gemma4:e2b stream
+	// `reasoning_content` unconditionally, so requests omit both
+	// (supportsReasoningEffort: false) while still capturing the always-on
+	// reasoning output. Only chat-capable models are catalogued; the
+	// nomic-embed-text embedding model is excluded.
 	const CLOUDOS_BASE_URL = "https://api-inference.cn.cloudos.com/v1";
 	const cloudosCompat: OpenAICompletionsCompat = {
 		supportsStore: false,
@@ -2472,6 +2474,36 @@ async function generateModels() {
 			reasoning: true,
 			thinkingLevelMap: { off: null },
 			input: ["text"],
+			cost: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+			compat: cloudosCompat,
+		},
+		{
+			id: "gemma4:e2b",
+			name: "Gemma 4 e2b",
+			api: "openai-completions",
+			baseUrl: CLOUDOS_BASE_URL,
+			provider: "cloudos",
+			reasoning: true,
+			thinkingLevelMap: { off: null },
+			input: ["text"],
+			cost: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 131072,
+			maxTokens: 8192,
+			compat: cloudosCompat,
+		},
+		// qwen2.5vl:7b is a vision-language model. The Ollama backend reports it
+		// does not support tools, so it is unsuitable for tool-driven agent
+		// sessions but works for plain chat and image input.
+		{
+			id: "qwen2.5vl:7b",
+			name: "Qwen2.5 VL 7B",
+			api: "openai-completions",
+			baseUrl: CLOUDOS_BASE_URL,
+			provider: "cloudos",
+			reasoning: false,
+			input: ["text", "image"],
 			cost: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 131072,
 			maxTokens: 8192,
