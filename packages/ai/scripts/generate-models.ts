@@ -246,6 +246,15 @@ const ZAI_GLM52_THINKING_LEVEL_MAP = {
 	high: "high",
 	max: "max",
 } as const;
+// GLM-5.3 exposes low/high/max reasoning effort (GLM-5.2 only has high/max),
+// so `low` maps directly instead of rounding up to `high`.
+const ZAI_GLM53_THINKING_LEVEL_MAP = {
+	minimal: null,
+	low: "low",
+	medium: "high",
+	high: "high",
+	max: "max",
+} as const;
 const OPENCODE_GO_GLM52_THINKING_LEVEL_MAP = {
 	off: null,
 	minimal: null,
@@ -1647,7 +1656,12 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 					if (m.tool_call !== true) continue;
 					const supportsImage = m.modalities?.input?.includes("image");
 
-					const isGlm52 = modelId === "glm-5.2";
+					const glmThinkingLevelMap =
+						modelId === "glm-5.2"
+							? ZAI_GLM52_THINKING_LEVEL_MAP
+							: modelId === "glm-5.3"
+								? ZAI_GLM53_THINKING_LEVEL_MAP
+								: undefined;
 
 					models.push({
 						id: modelId,
@@ -1656,7 +1670,7 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 						provider,
 						baseUrl,
 						reasoning: m.reasoning === true,
-						...(isGlm52 ? { thinkingLevelMap: ZAI_GLM52_THINKING_LEVEL_MAP } : {}),
+						...(glmThinkingLevelMap ? { thinkingLevelMap: glmThinkingLevelMap } : {}),
 						input: supportsImage ? ["text", "image"] : ["text"],
 						cost: {
 							input: m.cost?.input || 0,
@@ -1667,7 +1681,7 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 						compat: {
 							supportsDeveloperRole: false,
 							thinkingFormat: "zai",
-							...(isGlm52 ? { supportsReasoningEffort: true } : {}),
+							...(glmThinkingLevelMap ? { supportsReasoningEffort: true } : {}),
 							...(!ZAI_TOOL_STREAM_UNSUPPORTED_MODELS.has(modelId) ? { zaiToolStream: true } : {}),
 						},
 						contextWindow: m.limit?.context || 4096,
