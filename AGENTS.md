@@ -6,6 +6,9 @@
 - No emojis in commits, issues, PR comments, or code
 - No fluff or cheerful filler text (e.g., "Thanks @user" not "Thanks so much @user!")
 - Technical prose only, be direct
+- Use concise, clear, simple language. Define unavoidable jargon before using it.
+- Explain non-trivial designs and problems as: problem, concrete example or short trace, then solution. State why the solution is necessary and distinguish it from optional complexity.
+- Prefer concrete behavior and small illustrations over abstract summaries, dense terminology, or unexplained lists of changes.
 - When the user asks a question, answer it first before making edits or running implementation commands.
 - When responding to user feedback or an analysis, explicitly say whether you agree or disagree before saying what you changed.
 
@@ -114,6 +117,7 @@ Rules:
 
 - All new entries go under `## [Unreleased]`. Read the full section first and append to existing subsections; never duplicate them.
 - Released version sections (e.g. `## [0.12.2]`) are immutable; never modify them.
+- Do not create changelog entries when working on a branch other than `main` or pull request
 
 Attribution:
 
