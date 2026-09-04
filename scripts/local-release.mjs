@@ -6,6 +6,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const packages = [
+	{ directory: "packages/chord", name: "@earendil-works/chord" },
 	{ directory: "packages/telemetry", name: "@earendil-works/pi-telemetry" },
 	{ directory: "packages/ai", name: "@earendil-works/pi-ai" },
 	{ directory: "packages/tui", name: "@earendil-works/pi-tui" },
@@ -195,7 +196,9 @@ function packPackage(pkg, tarballDirectory) {
 		capture: true,
 		cwd: pkg.directory,
 	});
-	const packed = JSON.parse(output)[0];
+	// npm <11.6 returns an array; newer npm returns an object keyed by package name.
+	const parsed = JSON.parse(output);
+	const packed = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0];
 	return join(tarballDirectory, packed.filename);
 }
 

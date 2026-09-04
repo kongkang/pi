@@ -96,7 +96,7 @@ Then just talk to pi. By default, pi gives the model four tools: `read`, `write`
 
 ## Providers & Models
 
-For each built-in provider, pi maintains a list of tool-capable models. Configured provider catalogs refresh automatically; run `pi update --models` to force an immediate refresh. Authenticate via subscription (`/login`) or API key, then select any model from that provider via `/model` (or Ctrl+L).
+For each built-in provider, pi maintains a list of tool-capable models. Configured provider catalogs refresh automatically; run `pi update --models` to force an immediate refresh. Authenticate via subscription (`/login`) or API key, then select any model from that provider via `/model` (or Ctrl+L). Press Ctrl+S in the model picker to save the highlighted model as the startup default.
 
 **Subscriptions:**
 - Anthropic Claude Pro/Max
@@ -153,7 +153,7 @@ The interface from top to bottom:
 
 - **Startup header** - Shows shortcuts (`/hotkeys` for all), loaded AGENTS.md files, prompt templates, skills, and extensions
 - **Messages** - Your messages, assistant responses, tool calls and results, notifications, errors, and extension UI
-- **Editor** - Where you type; border color indicates thinking level
+- **Editor** - Where you type; border color indicates thinking level and the border shows the streaming working indicator
 - **Footer** - Working directory, session name, total token/cache usage (`↑` input, `↓` output, `R` cache read, `W` cache write, `CH` latest cache hit rate), cost, context usage, current model. Totals include assistant responses, usage reported by tools, and summary generation.
 
 The editor can be temporarily replaced by other UI, like built-in `/settings` or custom UI from extensions (e.g., a Q&A tool that lets the user answer model questions in a structured format). [Extensions](#extensions) can also replace the editor, add widgets above/below it, a status line, custom footer, or overlays.
@@ -179,9 +179,10 @@ Type `/` in the editor to trigger commands. [Extensions](#extensions) can regist
 |---------|-------------|
 | `/login`, `/logout` | Manage provider credentials |
 | [`/llama`](docs/llama-cpp.md) | Download, load, and unload llama.cpp router models |
-| `/model` | Switch models |
+| `/model` | Switch models; Ctrl+S in the picker saves the startup default |
+| `/thinking` | Switch thinking level; Ctrl+S in the picker saves the startup default |
 | `/scoped-models` | Enable/disable models for Ctrl+P cycling |
-| `/settings` | Thinking level, theme, message delivery, transport |
+| `/settings` | Theme, message delivery, transport, and other preferences |
 | `/resume` | Pick from previous sessions |
 | `/new` | Start a new session |
 | `/name <name>` | Set session display name |
@@ -217,7 +218,7 @@ See `/hotkeys` for the full list. Customize via `~/.pi/agent/keybindings.json`. 
 | Shift+Tab | Cycle thinking level |
 | Ctrl+O | Collapse/expand tool output |
 | Ctrl+T | Collapse/expand thinking blocks |
-| Ctrl+X | Copy the last assistant message |
+| Ctrl+X | Copy the last assistant message; with fullscreen copy-on-select disabled, copy the active text selection |
 
 ### Message Queue
 
@@ -515,7 +516,7 @@ Read the [blog post](https://mariozechner.at/posts/2025-11-30-pi-coding-agent/) 
 ## CLI Reference
 
 ```bash
-pi [options] [@files...] [messages...]
+pi [options] [--] [@files...] [messages...]
 ```
 
 ### Package Commands
@@ -585,7 +586,7 @@ cat README.md | pi -p "Summarize this text"
 | `--no-builtin-tools`, `-nbt` | Disable built-in tools by default but keep extension/custom tools enabled |
 | `--no-tools`, `-nt` | Disable all tools by default |
 
-Available built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`
+Available built-in tools: `read`, `bash`, `powershell` (Windows), `edit`, `write`, `grep`, `find`, `ls`
 
 ### Resource Options
 
@@ -610,9 +611,11 @@ Combine `--no-*` with explicit flags to load exactly what you need, ignoring set
 | `--system-prompt <text>` | Replace default prompt (context files and skills still appended) |
 | `--append-system-prompt <text>` | Append to system prompt |
 | `--tui-mode <mode>` | TUI mode: `regular` (default) or experimental `fullscreen` |
+| `--use-theme <name[/name]>` | Set the initial interactive theme for this run without changing settings |
 | `--verbose` | Force verbose startup |
 | `-a`, `--approve` | Trust project-local files for this run |
 | `-na`, `--no-approve` | Ignore project-local files for this run |
+| `--` | Stop option parsing; remaining arguments are prompts or `@file` inputs |
 | `-h`, `--help` | Show help |
 | `-v`, `--version` | Show version |
 
@@ -634,6 +637,9 @@ pi "List all .ts files in src/"
 
 # Non-interactive
 pi -p "Summarize this codebase"
+
+# Prompt beginning with a dash
+pi -p -- "- Summarize these points"
 
 # Non-interactive with piped stdin
 cat README.md | pi -p "Summarize this text"
@@ -672,13 +678,15 @@ pi --thinking high "Solve this complex problem"
 | `PI_CODING_AGENT_DIR` | Override config directory (default: `~/.pi/agent`) |
 | `PI_CODING_AGENT_SESSION_DIR` | Override session storage directory (overridden by `--session-dir`) |
 | `PI_PACKAGE_DIR` | Override package directory (useful for Nix/Guix where store paths tokenize poorly) |
+| `PI_SERVER_DIR` | Override experimental server profile and socket directory (default: `~/.pi/server`) |
+| `PI_SERVER_ID` | Select the logical experimental server ID when `--server-id` is omitted |
 | `PI_OFFLINE` | Disable startup network operations, including update checks, package update checks, and install/update telemetry |
 | `PI_SKIP_VERSION_CHECK` | Skip the Pi version update check at startup. This prevents the `pi.dev` latest-version request |
 | `PI_TELEMETRY` | Override install/update telemetry and provider attribution headers. Use `1`/`true`/`yes` to enable or `0`/`false`/`no` to disable. This does not disable update checks |
 | `PI_CACHE_RETENTION` | Set to `long` for extended prompt cache (Anthropic: 1h, OpenAI: 24h) |
 | `VISUAL`, `EDITOR` | Fallback external editor for Ctrl+G when `externalEditor` is unset; defaults to Notepad on Windows and `nano` elsewhere |
 
-Commands run by the LLM-callable bash tool also receive current session metadata:
+Commands run by the LLM-callable `bash` and `powershell` tools also receive current session metadata:
 
 | Variable | Description |
 |----------|-------------|
@@ -688,7 +696,7 @@ Commands run by the LLM-callable bash tool also receive current session metadata
 | `PI_MODEL` | Currently selected model ID |
 | `PI_REASONING_LEVEL` | Current effective reasoning level |
 
-These values are resolved when each command starts. See [Environment Variables](docs/environment-variables.md#bash-tool-session-environment) for semantics, examples, and custom-tool opt-out.
+These values are resolved when each command starts. See [Environment Variables](docs/environment-variables.md#shell-tool-session-environment) for semantics, examples, and custom-tool opt-out.
 
 ---
 
