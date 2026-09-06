@@ -21,6 +21,9 @@ Example extensions demonstrating:
 ### [feishu-gateway/](feishu-gateway/)
 Single-user bridge from the official Feishu CLI event stream to Pi RPC mode, with sender/chat allowlists, persistent sessions, and a macOS LaunchAgent installer.
 
+### [plugins/pi-example-plugin/](plugins/pi-example-plugin/)
+An experimental plugin package that Pi automatically builds into separate Session-worker and TUI Chord facets.
+
 ## Documentation
 
 - [SDK Reference](sdk/README.md)
